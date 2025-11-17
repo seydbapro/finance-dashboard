@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './styles.css'; 
+import './styles.css'; // Mis à jour pour résoudre le problème de casse (styles.css)
 
 function App() {
   const [ticker, setTicker] = useState('MSFT');
@@ -29,19 +29,26 @@ function App() {
 
       // --- 2. Récupération du ROCE (Scoring de Qualité) ---
       const roceRes = await fetch(`${BASE_URL}/roce?ticker=${ticker}`);
-      const roceJson = await roce.json();
+      const roceJson = await roceRes.json();
 
-      // --- 3. Calcul du DCF (avec WACC et hypothèse de croissance FCF) ---
+      // --- 3. Récupération du Ratio de Sharpe (Risque Ajusté) ---
+      const sharpeRes = await fetch(`${BASE_URL}/sharpe?ticker=${ticker}`);
+      const sharpeJson = await sharpeRes.json();
+
+      // --- 4. Calcul du DCF (avec WACC et hypothèse de croissance FCF) ---
       const dcfRes = await fetch(`${BASE_URL}/dcf_model?ticker=${ticker}&wacc=${calculatedWACC}&growth=${fcfGrowth / 100}`);
       const dcfJson = await dcfRes.json();
 
-      // --- 4. Mise à jour de l'état global ---
+      // --- 5. Mise à jour de l'état global ---
       setData({
         ticker,
         wacc: waccJson.data,
         roce: roceJson.data,
+        sharpe: sharpeJson.data, // Ajout du Ratio de Sharpe
         dcf: dcfJson.data,
-        error: dcfJson.error || roceJson.error || waccJson.error
+        
+        // Gestion des erreurs consolidées
+        error: dcfJson.error || roceJson.error || waccJson.error || sharpeJson.error
       });
 
     } catch (error) {
@@ -82,7 +89,7 @@ function App() {
               <div className={`kpi-card ${data.roce.roce_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
                 <h3>ROCE Moyen (Qualité)</h3>
                 <p className="kpi-value">{data.roce.roce_moyen_pct}%</p>
-                <small>Statut : {data.roce.roce_statut}</small>
+                <small>Statut : {data.roce.roce_regle}</small>
                 <p className="kpi-rule">{data.roce.roce_regle}</p>
               </div>
 
@@ -93,6 +100,16 @@ function App() {
                 <small>Règle : Bêta &le; 1.0 = Vert</small>
                 <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity_pct}%</p>
               </div>
+
+              {/* Carte 3 : RATIO DE SHARPE (Risque Ajusté) */}
+              {data.sharpe && (
+                <div className={`kpi-card ${data.sharpe.sharpe_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                    <h3>Ratio de Sharpe (Risque Ajusté)</h3>
+                    <p className="kpi-value">{data.sharpe.sharpe_ratio}</p>
+                    <small>Statut : {data.sharpe.sharpe_statut}</small>
+                    <p className="kpi-rule">Règle : {data.sharpe.regle}</p>
+                </div>
+              )}
           </div>
           
           <hr/>
