@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './App.css'; // Importe le style pour le code couleur
+import './App.css'; 
 
 function App() {
   const [ticker, setTicker] = useState('MSFT');
@@ -29,7 +29,7 @@ function App() {
 
       // --- 2. Récupération du ROCE (Scoring de Qualité) ---
       const roceRes = await fetch(`${BASE_URL}/roce?ticker=${ticker}`);
-      const roceJson = await roceRes.json();
+      const roceJson = await roce.json();
 
       // --- 3. Calcul du DCF (avec WACC et hypothèse de croissance FCF) ---
       const dcfRes = await fetch(`${BASE_URL}/dcf_model?ticker=${ticker}&wacc=${calculatedWACC}&growth=${fcfGrowth / 100}`);
