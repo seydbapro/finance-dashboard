@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './styles.css'; // Assurez-vous d'avoir renommé le fichier CSS en styles.css
+import './styles.css'; // Assurez-vous que votre fichier CSS est nommé styles.css
 
 function App() {
   const [ticker, setTicker] = useState('MSFT');
@@ -88,4 +88,35 @@ function App() {
               {/* Carte 1 : SCORING ROCE (Rouge/Vert) */}
               <div className={`kpi-card ${data.roce.roce_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
                 <h3>ROCE Moyen (Qualité)</h3>
-                <p className="kpi-value">{data
+                <p className="kpi-value">{data.roce.roce_moyen_pct}%</p>
+                <small>Statut : {data.roce.roce_regle}</small>
+                <p className="kpi-rule">{data.roce.roce_regle}</p>
+              </div>
+
+              {/* Carte 2 : RISQUE (Bêta) */}
+              <div className={`kpi-card ${data.wacc.beta > 1.0 ? 'bg-red' : 'bg-green'}`}>
+                <h3>Bêta (Volatilité)</h3>
+                <p className="kpi-value">{data.wacc.beta}</p>
+                <small>Règle : Bêta &le; 1.0 = Vert</small>
+                <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity_pct}%</p>
+              </div>
+
+              {/* Carte 3 : RATIO DE SHARPE (Risque Ajusté) */}
+              {data.sharpe && (
+                <div className={`kpi-card ${data.sharpe.sharpe_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                    <h3>Ratio de Sharpe (Risque Ajusté)</h3>
+                    <p className="kpi-value">{data.sharpe.sharpe_ratio}</p>
+                    <small>Statut : {data.sharpe.sharpe_statut}</small>
+                    <p className="kpi-rule">Règle : {data.sharpe.regle}</p>
+                </div>
+              )}
+          </div>
+          
+          <hr/>
+          
+          {/* SECTION DCF / VALORISATION INTERACTIVE */}
+          <div className="dcf-panel">
+            <h3>🎯 Modèle DCF (Prix Cible)</h3>
+            <p>Taux d'Actualisation (WACC) : <strong>{data.wacc.wacc_pct}%</strong></p>
+            
+            {/* Hypothèse FCF Modifiable */}
