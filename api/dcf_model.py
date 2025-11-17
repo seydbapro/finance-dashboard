@@ -1,4 +1,3 @@
-# Fichier : /api/dcf_model.py
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
@@ -7,10 +6,16 @@ import numpy as np
 
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
 
-# --- HYPOTHÈSES DU MODÈLE (Définies par l'utilisateur ou par défaut) ---
-DEFAULT_GROWTH = 0.10     # 10% de croissance annuelle par défaut
+# --- HYPOTHÈSES DU MODÈLE ---
 TERMINAL_GROWTH_RATE = 0.025 # 2.5% de croissance perpétuelle
 PROJECTION_YEARS = 5
+
+# Structure de la réponse pour Vercel
+class VercelResponse:
+    def __init__(self, data, status=200):
+        self.headers = {'Content-Type': 'application/json'}
+        self.status = status
+        self.data = json.dumps(data)
 
 def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
     """
@@ -46,7 +51,7 @@ def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
     fcf_an_6 = fcf_an_precedent * (1 + TERMINAL_GROWTH_RATE)
     
     if wacc <= TERMINAL_GROWTH_RATE: 
-         return {"error": "WACC <= taux de croissance perpétuelle."}
+         return {"error": "WACC <= taux de croissance perpétuelle. DCF non valide."}
          
     terminal_value = fcf_an_6 / (wacc - TERMINAL_GROWTH_RATE)
     present_value_tv = terminal_value / ((1 + wacc) ** PROJECTION_YEARS)
@@ -63,27 +68,24 @@ def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
         "fcf_base": fcf_base
     }
 
+# --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
 def handler(request: BaseHTTPRequestHandler):
-    query = urlparse(request.url).query
-    params = parse_qs(query)
-    
-    ticker = params.get('ticker', ['MSFT'])[0].upper()
+    ticker = request.query.get('ticker', ['MSFT'])[0].upper()
     
     try:
-        # Tenter de lire les paramètres interactifs
-        wacc = float(params.get('wacc', [0.0915])[0]) 
-        growth_rate = float(params.get('growth', [DEFAULT_GROWTH])[0])
+        wacc = float(request.query.get('wacc', 0.0915))
+        growth_rate = float(request.query.get('growth', 0.10))
 
     except ValueError:
-        return json.dumps({"success": False, "error": "Les paramètres WACC ou Croissance doivent être numériques."}), 400
+        return VercelResponse({"success": False, "error": "Les paramètres WACC ou Croissance doivent être numériques."}, status=400)
 
     try:
-        dcf_result = calculate_dcf(ticker, wacc, growth_rate, API_KEY)
+        result = calculate_dcf(ticker, wacc, growth_rate, API_KEY)
         
-        if "error" in dcf_result:
-            return json.dumps({"success": False, "error": dcf_result["error"]}), 400
-        
-        return json.dumps({"success": True, "data": dcf_result}), 200
+        if "error" in result:
+            return VercelResponse({"success": False, "error": result["error"]}, status=400)
+            
+        return VercelResponse({"success": True, "data": result})
     
     except Exception as e:
-        return json.dumps({"success": False, "error": f"Erreur fatale dans le modèle DCF: {e}"}), 500
+        return VercelResponse({"success": False, "error": f"Erreur fatale interne: {e}"}, status=500)

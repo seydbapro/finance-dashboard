@@ -1,12 +1,19 @@
-# Fichier : /api/roce.py
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
 import json
 import numpy as np
 
+# Votre clé API FMP
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
 ROCE_THRESHOLD = 0.15 # Seuil de 15% pour le scoring
+
+# Structure de la réponse pour Vercel
+class VercelResponse:
+    def __init__(self, data, status=200):
+        self.headers = {'Content-Type': 'application/json'}
+        self.status = status
+        self.data = json.dumps(data)
 
 def calculate_roce(ticker: str, api_key: str):
     """
@@ -53,14 +60,17 @@ def calculate_roce(ticker: str, api_key: str):
         "roce_regle": f"Moyenne sur 5 ans >= {ROCE_THRESHOLD * 100}%"
     }
 
+# --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
 def handler(request: BaseHTTPRequestHandler):
-    query = urlparse(request.url).query
-    params = parse_qs(query)
-    ticker = params.get('ticker', ['MSFT'])[0].upper()
+    ticker = request.query.get('ticker', 'MSFT').upper()
     
-    roce_result = calculate_roce(ticker, API_KEY)
-    
-    if "error" in roce_result:
-        return json.dumps(roce_result), 400
+    try:
+        result = calculate_roce(ticker, API_KEY)
         
-    return json.dumps({"success": True, "data": roce_result}), 200
+        if "error" in result:
+            return VercelResponse({"success": False, "error": result["error"]}, status=400)
+            
+        return VercelResponse({"success": True, "data": result})
+    
+    except Exception as e:
+        return VercelResponse({"success": False, "error": f"Erreur fatale interne: {e}"}, status=500)
