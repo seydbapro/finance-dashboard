@@ -90,7 +90,7 @@ function App() {
               <div className={`kpi-card ${data.roce.roce_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
                 <h3>ROCE Moyen (Qualité)</h3>
                 <p className="kpi-value">{data.roce.roce_moyen_pct}%</p>
-                <small>Statut : {data.roce.roce_regle}</small>
+                <small>Statut : {data.roce.roce_statut}</small>
                 <p className="kpi-rule">{data.roce.roce_regle}</p>
               </div>
 
@@ -99,4 +99,50 @@ function App() {
                 <h3>Bêta (Volatilité)</h3>
                 <p className="kpi-value">{data.wacc.beta}</p>
                 <small>Règle : Bêta &le; 1.0 = Vert</small>
-                <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity
+                <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity_pct}%</p>
+              </div>
+
+              {/* Carte 3 : RATIO DE SHARPE (Risque Ajusté) */}
+              {data.sharpe && (
+                <div className={`kpi-card ${data.sharpe.sharpe_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                    <h3>Ratio de Sharpe (Risque Ajusté)</h3>
+                    <p className="kpi-value">{data.sharpe.sharpe_ratio}</p>
+                    <small>Statut : {data.sharpe.sharpe_statut}</small>
+                    <p className="kpi-rule">Règle : {data.sharpe.regle}</p>
+                </div>
+              )}
+          </div>
+          
+          <hr/>
+          
+          {/* SECTION DCF / VALORISATION INTERACTIVE */}
+          <div className="dcf-panel">
+            <h3>🎯 Modèle DCF (Prix Cible)</h3>
+            <p>Taux d'Actualisation (WACC) : <strong>{data.wacc.wacc_pct}%</strong></p>
+            
+            {/* Hypothèse FCF Modifiable */}
+            <div className="input-group">
+                <label>Croissance FCF (Années 1-5) :</label>
+                <input 
+                    type="number" 
+                    value={fcfGrowth} 
+                    onChange={(e) => setFcfGrowth(e.target.value)}
+                    onBlur={fetchData} // DÉCLENCHE le recalcul DCF dès que l'utilisateur quitte le champ
+                />
+                <span>%</span>
+            </div>
+
+            <div className="price-output">
+                Prix Cible (Fair Value): 
+                <span className="price-value">${data.dcf.prix_cible_dcf}</span>
+            </div>
+            <small>Basé sur une croissance perpétuelle de 2.5% et FCF de base : ${data.dcf.fcf_base / 1e9} Mds</small>
+          </div>
+          
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
