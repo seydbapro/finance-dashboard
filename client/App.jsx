@@ -1,0 +1,130 @@
+import React, { useState } from 'react';
+import './App.css'; // Importe le style pour le code couleur
+
+function App() {
+  const [ticker, setTicker] = useState('MSFT');
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState(null);
+  const [fcfGrowth, setFcfGrowth] = useState(10); // Hypothèse FCF par défaut (10%)
+  
+  // L'URL de base pour appeler vos fonctions Python Serverless sur Vercel
+  const BASE_URL = '/api'; 
+
+  const fetchData = async () => {
+    if (!ticker) return;
+
+    setLoading(true);
+    setData(null);
+
+    try {
+      // --- 1. Récupération du WACC (Taux d'Actualisation) ---
+      const waccRes = await fetch(`${BASE_URL}/wacc?ticker=${ticker}`);
+      const waccJson = await waccRes.json();
+      
+      const calculatedWACC = waccJson.success ? waccJson.data.wacc : null;
+      
+      if (!calculatedWACC) {
+        throw new Error(waccJson.error || 'Erreur lors du calcul du WACC');
+      }
+
+      // --- 2. Récupération du ROCE (Scoring de Qualité) ---
+      const roceRes = await fetch(`${BASE_URL}/roce?ticker=${ticker}`);
+      const roceJson = await roceRes.json();
+
+      // --- 3. Calcul du DCF (avec WACC et hypothèse de croissance FCF) ---
+      const dcfRes = await fetch(`${BASE_URL}/dcf_model?ticker=${ticker}&wacc=${calculatedWACC}&growth=${fcfGrowth / 100}`);
+      const dcfJson = await dcfRes.json();
+
+      // --- 4. Mise à jour de l'état global ---
+      setData({
+        ticker,
+        wacc: waccJson.data,
+        roce: roceJson.data,
+        dcf: dcfJson.data,
+        error: dcfJson.error || roceJson.error || waccJson.error
+      });
+
+    } catch (error) {
+      setData({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container">
+      <h1>💰 Analyse d'Investissement Interactif</h1>
+      
+      {/* ----------------- Composant de Recherche ----------------- */}
+      <div className="search-bar">
+        <input
+          type="text"
+          value={ticker}
+          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+          placeholder="Entrez un Ticker (ex: MSFT)"
+        />
+        <button onClick={fetchData} disabled={loading}>
+          {loading ? 'Analyse en cours...' : 'Analyser le Ticker'}
+        </button>
+      </div>
+
+      {/* Affichage des Erreurs */}
+      {data && data.error && <p className="error-message">Erreur : {data.error}</p>}
+
+      {/* ----------------- AFFICHAGE DES RÉSULTATS ----------------- */}
+      {data && !data.error && (
+        <div className="results">
+          <h2>Résultats Clés pour {data.ticker}</h2>
+
+          <div className="grid-layout">
+              
+              {/* Carte 1 : SCORING ROCE (Rouge/Vert) */}
+              <div className={`kpi-card ${data.roce.roce_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                <h3>ROCE Moyen (Qualité)</h3>
+                <p className="kpi-value">{data.roce.roce_moyen_pct}%</p>
+                <small>Statut : {data.roce.roce_statut}</small>
+                <p className="kpi-rule">{data.roce.roce_regle}</p>
+              </div>
+
+              {/* Carte 2 : RISQUE (Bêta) */}
+              <div className={`kpi-card ${data.wacc.beta > 1.0 ? 'bg-red' : 'bg-green'}`}>
+                <h3>Bêta (Volatilité)</h3>
+                <p className="kpi-value">{data.wacc.beta}</p>
+                <small>Règle : Bêta &le; 1.0 = Vert</small>
+                <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity_pct}%</p>
+              </div>
+          </div>
+          
+          <hr/>
+          
+          {/* SECTION DCF / VALORISATION INTERACTIVE */}
+          <div className="dcf-panel">
+            <h3>🎯 Modèle DCF (Prix Cible)</h3>
+            <p>Taux d'Actualisation (WACC) : <strong>{data.wacc.wacc_pct}%</strong></p>
+            
+            {/* Hypothèse FCF Modifiable */}
+            <div className="input-group">
+                <label>Croissance FCF (Années 1-5) :</label>
+                <input 
+                    type="number" 
+                    value={fcfGrowth} 
+                    onChange={(e) => setFcfGrowth(e.target.value)}
+                    onBlur={fetchData} // DÉCLENCHE le recalcul DCF dès que l'utilisateur quitte le champ
+                />
+                <span>%</span>
+            </div>
+
+            <div className="price-output">
+                Prix Cible (Fair Value): 
+                <span className="price-value">${data.dcf.prix_cible_dcf}</span>
+            </div>
+            <small>Basé sur une croissance perpétuelle de 2.5% et FCF de base : ${data.dcf.fcf_base / 1e9} Mds</small>
+          </div>
+          
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
