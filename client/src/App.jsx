@@ -24,7 +24,8 @@ function App() {
       const calculatedWACC = waccJson.success ? waccJson.data.wacc : null;
       
       if (!calculatedWACC) {
-        throw new Error(waccJson.error || 'Erreur lors du calcul du WACC');
+        // En cas d'échec du WACC (ticker non trouvé), on lance l'erreur
+        throw new Error(waccJson.error || 'Erreur lors du calcul du WACC. Vérifiez le ticker.');
       }
 
       // --- 2. Récupération du ROCE (Scoring de Qualité) ---
@@ -115,8 +116,3 @@ function App() {
           <hr/>
           
           {/* SECTION DCF / VALORISATION INTERACTIVE */}
-          <div className="dcf-panel">
-            <h3>🎯 Modèle DCF (Prix Cible)</h3>
-            <p>Taux d'Actualisation (WACC) : <strong>{data.wacc.wacc_pct}%</strong></p>
-            
-            {/* Hypothèse FCF Modifiable */}
