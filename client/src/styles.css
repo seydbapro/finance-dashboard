@@ -1,4 +1,4 @@
-/* Fichier : client/src/App.css */
+/* Fichier : client/src/styles.css (ou app.css) */
 body {
     font-family: sans-serif;
     background-color: #121212; /* Thème sombre */
@@ -40,7 +40,7 @@ h1 {
 /* Mise en Page des KPI (Grille) */
 .grid-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr; /* 3 colonnes pour les 3 KPI principaux */
     gap: 20px;
     margin-bottom: 20px;
 }

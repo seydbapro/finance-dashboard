@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import './styles.css'; // Assurez-vous que votre fichier CSS est nommé styles.css
+import './styles.css'; 
 
 function App() {
   const [ticker, setTicker] = useState('MSFT');
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
-  const [fcfGrowth, setFcfGrowth] = useState(10); // Hypothèse FCF par défaut (10%)
   
-  // L'URL de base pour appeler vos fonctions Python Serverless sur Vercel
+  // L'URL de base pour appeler la fonction Python data_fetcher
   const BASE_URL = '/api'; 
 
   const fetchData = async () => {
@@ -17,39 +16,24 @@ function App() {
     setData(null);
 
     try {
-      // --- 1. Récupération du WACC (Taux d'Actualisation) ---
-      const waccRes = await fetch(`${BASE_URL}/wacc?ticker=${ticker}`);
-      const waccJson = await waccRes.json();
+      // --- APPEL UNIQUE pour récupérer TOUTES les métriques de base (data_fetcher.py) ---
+      const metricsRes = await fetch(`${BASE_URL}/data_fetcher?ticker=${ticker}`);
+      const metricsJson = await metricsRes.json();
       
-      const calculatedWACC = waccJson.success ? waccJson.data.wacc : null;
-      
-      if (!calculatedWACC) {
-        // En cas d'échec du WACC (ticker non trouvé), on lance l'erreur
-        throw new Error(waccJson.error || 'Erreur lors du calcul du WACC. Vérifiez le ticker.');
+      if (!metricsJson.success) {
+        throw new Error(metricsJson.error || 'Erreur lors de la récupération des données.');
       }
 
-      // --- 2. Récupération du ROCE (Scoring de Qualité) ---
-      const roceRes = await fetch(`${BASE_URL}/roce?ticker=${ticker}`);
-      const roceJson = await roceRes.json();
+      const metrics = metricsJson.data;
 
-      // --- 3. Récupération du Ratio de Sharpe (Risque Ajusté) ---
-      const sharpeRes = await fetch(`${BASE_URL}/sharpe?ticker=${ticker}`);
-      const sharpeJson = await sharpeRes.json();
+      // Logique d'affichage simple du statut Bêta (Règle: Beta > 1.0 = Rouge)
+      const betaStatus = metrics.beta > 1.0 ? 'Rouge' : 'Vert';
 
-      // --- 4. Calcul du DCF (avec WACC et hypothèse de croissance FCF) ---
-      const dcfRes = await fetch(`${BASE_URL}/dcf_model?ticker=${ticker}&wacc=${calculatedWACC}&growth=${fcfGrowth / 100}`);
-      const dcfJson = await dcfRes.json();
-
-      // --- 5. Mise à jour de l'état global ---
       setData({
         ticker,
-        wacc: waccJson.data,
-        roce: roceJson.data,
-        sharpe: sharpeJson.data, // Ajout du Ratio de Sharpe
-        dcf: dcfJson.data,
-        
-        // Gestion des erreurs consolidées
-        error: dcfJson.error || roceJson.error || waccJson.error || sharpeJson.error
+        metrics,
+        betaStatus,
+        error: null
       });
 
     } catch (error) {
@@ -61,7 +45,7 @@ function App() {
 
   return (
     <div className="container">
-      <h1>💰 Analyse d'Investissement Interactif</h1>
+      <h1>💰 Tableau de Bord FMP (Données Brutes)</h1>
       
       {/* ----------------- Composant de Recherche ----------------- */}
       <div className="search-bar">
@@ -72,7 +56,7 @@ function App() {
           placeholder="Entrez un Ticker (ex: MSFT)"
         />
         <button onClick={fetchData} disabled={loading}>
-          {loading ? 'Analyse en cours...' : 'Analyser le Ticker'}
+          {loading ? 'Connexion FMP...' : 'Analyser le Ticker'}
         </button>
       </div>
 
@@ -82,63 +66,40 @@ function App() {
       {/* ----------------- AFFICHAGE DES RÉSULTATS ----------------- */}
       {data && !data.error && (
         <div className="results">
-          <h2>Résultats Clés pour {data.ticker}</h2>
+          <h2>Résultats Bruts pour {data.ticker}</h2>
 
-          <div className="grid-layout">
+          <div className="grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               
-              {/* Carte 1 : SCORING ROCE (Rouge/Vert) */}
-              <div className={`kpi-card ${data.roce.roce_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
-                <h3>ROCE Moyen (Qualité)</h3>
-                <p className="kpi-value">{data.roce.roce_moyen_pct}%</p>
-                <small>Statut : {data.roce.roce_statut}</small>
-                <p className="kpi-rule">{data.roce.roce_regle}</p>
+              {/* Carte 1 : VALEUR (P/E) */}
+              <div className="kpi-card bg-green">
+                <h3>Ratio P/E Brut</h3>
+                <p className="kpi-value">{data.metrics.pe_ratio}</p>
+                <small>Donnée brute de FMP</small>
               </div>
 
-              {/* Carte 2 : RISQUE (Bêta) */}
-              <div className={`kpi-card ${data.wacc.beta > 1.0 ? 'bg-red' : 'bg-green'}`}>
-                <h3>Bêta (Volatilité)</h3>
-                <p className="kpi-value">{data.wacc.beta}</p>
-                <small>Règle : Bêta &le; 1.0 = Vert</small>
-                <p className="kpi-rule">Coût des Capitaux Propres : {data.wacc.cost_of_equity_pct}%</p>
+              {/* Carte 2 : VOLATILITÉ (Bêta) */}
+              <div className={`kpi-card ${data.betaStatus === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                <h3>Bêta Brut</h3>
+                <p className="kpi-value">{data.metrics.beta}</p>
+                <small>Volatilité par rapport au marché</small>
               </div>
 
-              {/* Carte 3 : RATIO DE SHARPE (Risque Ajusté) */}
-              {data.sharpe && (
-                <div className={`kpi-card ${data.sharpe.sharpe_statut === 'Vert' ? 'bg-green' : 'bg-red'}`}>
-                    <h3>Ratio de Sharpe (Risque Ajusté)</h3>
-                    <p className="kpi-value">{data.sharpe.sharpe_ratio}</p>
-                    <small>Statut : {data.sharpe.sharpe_statut}</small>
-                    <p className="kpi-rule">Règle : {data.sharpe.regle}</p>
-                </div>
-              )}
+              {/* Carte 3 : CAP BOURSIERE (Market Cap) */}
+              <div className="kpi-card bg-green">
+                <h3>Capitalisation Boursière</h3>
+                <p className="kpi-value">${(data.metrics.market_cap / 1e9).toFixed(2)} Mds</p>
+                <small>Donnée financière brute</small>
+              </div>
           </div>
           
           <hr/>
           
-          {/* SECTION DCF / VALORISATION INTERACTIVE */}
           <div className="dcf-panel">
-            <h3>🎯 Modèle DCF (Prix Cible)</h3>
-            <p>Taux d'Actualisation (WACC) : <strong>{data.wacc.wacc_pct}%</strong></p>
-            
-            {/* Hypothèse FCF Modifiable */}
-            <div className="input-group">
-                <label>Croissance FCF (Années 1-5) :</label>
-                <input 
-                    type="number" 
-                    value={fcfGrowth} 
-                    onChange={(e) => setFcfGrowth(e.target.value)}
-                    onBlur={fetchData} // DÉCLENCHE le recalcul DCF dès que l'utilisateur quitte le champ
-                />
-                <span>%</span>
-            </div>
-
-            <div className="price-output">
-                Prix Cible (Fair Value): 
-                <span className="price-value">${data.dcf.prix_cible_dcf}</span>
-            </div>
-            <small>Basé sur une croissance perpétuelle de 2.5% et FCF de base : ${data.dcf.fcf_base / 1e9} Mds</small>
+            <h3>Métriques Détaillées</h3>
+            <p>EPS TTM : <strong>${data.metrics.eps_ttm}</strong></p>
+            <p>Dette Nette : <strong>${(data.metrics.net_debt / 1e9).toFixed(2)} Mds</strong></p>
+            <p>Actions en Circulation : <strong>{(data.metrics.shares_outstanding / 1e9).toFixed(2)} Mds</strong></p>
           </div>
-          
         </div>
       )}
     </div>
