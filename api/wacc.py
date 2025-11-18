@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
 import json
@@ -8,13 +7,6 @@ import numpy as np
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
 RISK_FREE_RATE = 0.040        # Taux sans risque (4.0%)
 MARKET_RISK_PREMIUM = 0.060   # Prime de risque du marché (6.0%)
-
-# Structure de la réponse pour Vercel
-class VercelResponse:
-    def __init__(self, data, status=200):
-        self.headers = {'Content-Type': 'application/json'}
-        self.status = status
-        self.data = json.dumps(data)
 
 def calculate_wacc(ticker: str, api_key: str):
     """
@@ -29,7 +21,7 @@ def calculate_wacc(ticker: str, api_key: str):
         income = requests.get(income_url).json()[0]
         balance = requests.get(balance_url).json()[0]
     except Exception:
-        return {"error": "Échec de la récupération des données financières FMP."}
+        return {"error": "Échec de la récupération des données financières FMP pour le WACC. Ticker invalide ?"}
 
     market_cap_E = metrics.get('marketCap', 0)
     total_debt_D = balance.get('totalDebt', 0)
@@ -51,23 +43,32 @@ def calculate_wacc(ticker: str, api_key: str):
     wacc = equity_term + debt_term
 
     return {
-        "wacc": wacc, # Important : retourne la valeur décimale pour le DCF
+        "wacc": wacc, 
         "wacc_pct": round(wacc * 100, 2),
         "beta": round(beta, 2),
         "cost_of_equity_pct": round(cost_of_equity_Re * 100, 2),
     }
 
 # --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
-def handler(request: BaseHTTPRequestHandler):
-    ticker = request.query.get('ticker', 'MSFT').upper()
+def handler(request):
+    """
+    Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.
+    """
+    # Lecture des paramètres
+    try:
+        ticker = request.query.get('ticker', 'MSFT').upper()
+    except:
+        query = urlparse(request.url).query
+        params = parse_qs(query)
+        ticker = params.get('ticker', ['MSFT'])[0].upper()
     
     try:
         result = calculate_wacc(ticker, API_KEY)
         
         if "error" in result:
-            return VercelResponse({"success": False, "error": result["error"]}, status=400)
+            return {"success": False, "error": result["error"]}, 400
             
-        return VercelResponse({"success": True, "data": result})
+        return {"success": True, "data": result}
     
     except Exception as e:
-        return VercelResponse({"success": False, "error": f"Erreur fatale interne: {e}"}, status=500)
+        return {"success": False, "error": f"Erreur fatale interne: {e}"}, 500

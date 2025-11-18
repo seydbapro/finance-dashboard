@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
 import json
@@ -7,13 +6,6 @@ import numpy as np
 # Votre clé API FMP
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
 ROCE_THRESHOLD = 0.15 # Seuil de 15% pour le scoring
-
-# Structure de la réponse pour Vercel
-class VercelResponse:
-    def __init__(self, data, status=200):
-        self.headers = {'Content-Type': 'application/json'}
-        self.status = status
-        self.data = json.dumps(data)
 
 def calculate_roce(ticker: str, api_key: str):
     """
@@ -30,8 +22,9 @@ def calculate_roce(ticker: str, api_key: str):
 
     roce_list = []
     
-    if not balance_data or not income_data or len(balance_data) != len(income_data):
-         return {"error": "Données incomplètes ou non synchronisées pour le calcul du ROCE."}
+    # Vérification des données FMP (le code de l'API peut renvoyer un JSON d'erreur)
+    if not balance_data or not income_data or isinstance(balance_data, dict) or len(balance_data) != len(income_data):
+         return {"error": "Données fondamentales incomplètes pour le ROCE. Vérifiez l'accès API."}
 
     for bs, inc in zip(balance_data, income_data):
         try:
@@ -61,16 +54,25 @@ def calculate_roce(ticker: str, api_key: str):
     }
 
 # --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
-def handler(request: BaseHTTPRequestHandler):
-    ticker = request.query.get('ticker', 'MSFT').upper()
+def handler(request):
+    """
+    Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.
+    """
+    # Lecture des paramètres
+    try:
+        ticker = request.query.get('ticker', 'MSFT').upper()
+    except:
+        query = urlparse(request.url).query
+        params = parse_qs(query)
+        ticker = params.get('ticker', ['MSFT'])[0].upper()
     
     try:
         result = calculate_roce(ticker, API_KEY)
         
         if "error" in result:
-            return VercelResponse({"success": False, "error": result["error"]}, status=400)
+            return {"success": False, "error": result["error"]}, 400
             
-        return VercelResponse({"success": True, "data": result})
+        return {"success": True, "data": result}
     
     except Exception as e:
-        return VercelResponse({"success": False, "error": f"Erreur fatale interne: {e}"}, status=500)
+        return {"success": False, "error": f"Erreur fatale interne: {e}"}, 500

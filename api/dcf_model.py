@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 import requests
 import json
@@ -9,13 +8,6 @@ API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS"
 # --- HYPOTHÈSES DU MODÈLE ---
 TERMINAL_GROWTH_RATE = 0.025 # 2.5% de croissance perpétuelle
 PROJECTION_YEARS = 5
-
-# Structure de la réponse pour Vercel
-class VercelResponse:
-    def __init__(self, data, status=200):
-        self.headers = {'Content-Type': 'application/json'}
-        self.status = status
-        self.data = json.dumps(data)
 
 def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
     """
@@ -28,7 +20,7 @@ def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
         cf_data = requests.get(cf_url).json()[0]
         metrics = requests.get(metrics_url).json()[0]
     except Exception:
-        return {"error": "Échec de la récupération des données de Flux de Trésorerie ou Métriques."}
+        return {"error": "Échec de la récupération des données FCF pour le DCF."}
 
     fcf_base = cf_data.get('freeCashFlow', 0)
     shares_outstanding = metrics.get('sharesOutstanding', 1)
@@ -69,23 +61,29 @@ def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
     }
 
 # --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
-def handler(request: BaseHTTPRequestHandler):
-    ticker = request.query.get('ticker', ['MSFT'])[0].upper()
-    
+def handler(request):
+    """
+    Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.
+    """
+    # Lecture des paramètres
     try:
+        ticker = request.query.get('ticker', 'MSFT').upper()
         wacc = float(request.query.get('wacc', 0.0915))
         growth_rate = float(request.query.get('growth', 0.10))
-
-    except ValueError:
-        return VercelResponse({"success": False, "error": "Les paramètres WACC ou Croissance doivent être numériques."}, status=400)
-
+    except:
+        query = urlparse(request.url).query
+        params = parse_qs(query)
+        ticker = params.get('ticker', ['MSFT'])[0].upper()
+        wacc = float(params.get('wacc', [0.0915])[0])
+        growth_rate = float(params.get('growth', [0.10])[0])
+    
     try:
         result = calculate_dcf(ticker, wacc, growth_rate, API_KEY)
         
         if "error" in result:
-            return VercelResponse({"success": False, "error": result["error"]}, status=400)
+            return {"success": False, "error": result["error"]}, 400
             
-        return VercelResponse({"success": True, "data": result})
+        return {"success": True, "data": result}
     
     except Exception as e:
-        return VercelResponse({"success": False, "error": f"Erreur fatale interne: {e}"}, status=500)
+        return {"success": False, "error": f"Erreur fatale interne: {e}"}, 500
