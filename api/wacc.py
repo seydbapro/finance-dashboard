@@ -5,23 +5,24 @@ import numpy as np
 
 # Votre clé API FMP
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
-RISK_FREE_RATE = 0.040        # Taux sans risque (4.0%)
-MARKET_RISK_PREMIUM = 0.060   # Prime de risque du marché (6.0%)
+RISK_FREE_RATE = 0.040       
+MARKET_RISK_PREMIUM = 0.060   
 
 def calculate_wacc(ticker: str, api_key: str):
     """
-    Récupère les données FMP et calcule le Coût Moyen Pondéré du Capital (WACC).
+    MIGRÉ : Utilise les nouveaux endpoints FMP *-full* pour le calcul du WACC.
     """
-    metrics_url = f"https://financialmodelingprep.com/api/v3/key-metrics/{ticker}?limit=1&apikey={api_key}"
-    income_url = f"https://financialmodelingprep.com/api/v3/income-statement/{ticker}?limit=1&apikey={api_key}"
-    balance_url = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{ticker}?limit=1&apikey={api_key}"
+    # NOUVEAUX ENDPOINTS FMP
+    metrics_url = f"https://financialmodelingprep.com/api/v3/key-metrics-full/{ticker}?limit=1&apikey={api_key}"
+    income_url = f"https://financialmodelingprep.com/api/v3/income-statement-full/{ticker}?limit=1&apikey={api_key}"
+    balance_url = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement-full/{ticker}?limit=1&apikey={api_key}"
 
     try:
         metrics = requests.get(metrics_url).json()[0]
         income = requests.get(income_url).json()[0]
         balance = requests.get(balance_url).json()[0]
     except Exception:
-        return {"error": "Échec de la récupération des données financières FMP pour le WACC. Ticker invalide ?"}
+        return {"error": "Échec de la récupération des données financières FMP pour le WACC. Ticker invalide ou endpoints non supportés."}
 
     market_cap_E = metrics.get('marketCap', 0)
     total_debt_D = balance.get('totalDebt', 0)
@@ -49,7 +50,7 @@ def calculate_wacc(ticker: str, api_key: str):
         "cost_of_equity_pct": round(cost_of_equity_Re * 100, 2),
     }
 
-# --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
+# --- Fonction Serverless de Vercel ---
 def handler(request):
     """
     Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.

@@ -5,14 +5,15 @@ import numpy as np
 
 # Votre clé API FMP
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
-ROCE_THRESHOLD = 0.15 # Seuil de 15% pour le scoring
+ROCE_THRESHOLD = 0.15 
 
 def calculate_roce(ticker: str, api_key: str):
     """
-    Récupère les données FMP et calcule le ROCE moyen sur les 5 dernières années.
+    MIGRÉ : Utilise les nouveaux endpoints FMP *-full* pour les états financiers.
     """
-    balance_sheet_url = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement/{ticker}?limit=5&apikey={api_key}"
-    income_statement_url = f"https://financialmodelingprep.com/api/v3/income-statement/{ticker}?limit=5&apikey={api_key}"
+    # NOUVEAUX ENDPOINTS FMP
+    balance_sheet_url = f"https://financialmodelingprep.com/api/v3/balance-sheet-statement-full/{ticker}?limit=5&apikey={api_key}"
+    income_statement_url = f"https://financialmodelingprep.com/api/v3/income-statement-full/{ticker}?limit=5&apikey={api_key}"
 
     try:
         balance_data = requests.get(balance_sheet_url).json()
@@ -22,7 +23,7 @@ def calculate_roce(ticker: str, api_key: str):
 
     roce_list = []
     
-    # Vérification des données FMP (le code de l'API peut renvoyer un JSON d'erreur)
+    # Vérification des données FMP
     if not balance_data or not income_data or isinstance(balance_data, dict) or len(balance_data) != len(income_data):
          return {"error": "Données fondamentales incomplètes pour le ROCE. Vérifiez l'accès API."}
 
@@ -53,7 +54,7 @@ def calculate_roce(ticker: str, api_key: str):
         "roce_regle": f"Moyenne sur 5 ans >= {ROCE_THRESHOLD * 100}%"
     }
 
-# --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
+# --- Fonction Serverless de Vercel ---
 def handler(request):
     """
     Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.

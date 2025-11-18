@@ -6,21 +6,22 @@ import numpy as np
 API_KEY = "GYU2oxLWxz5XvJKHtrpBghiNSsCLxJUS" 
 
 # --- HYPOTHÈSES DU MODÈLE ---
-TERMINAL_GROWTH_RATE = 0.025 # 2.5% de croissance perpétuelle
+TERMINAL_GROWTH_RATE = 0.025 
 PROJECTION_YEARS = 5
 
 def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
     """
-    Récupère les données FCF et calcule la Juste Valeur (Fair Value) par action.
+    MIGRÉ : Utilise les nouveaux endpoints FMP *-full* pour le calcul du DCF.
     """
-    cf_url = f"https://financialmodelingprep.com/api/v3/cash-flow-statement/{ticker}?limit=1&apikey={api_key}"
-    metrics_url = f"https://financialmodelingprep.com/api/v3/key-metrics/{ticker}?limit=1&apikey={api_key}"
+    # NOUVEAUX ENDPOINTS FMP
+    cf_url = f"https://financialmodelingprep.com/api/v3/cash-flow-statement-full/{ticker}?limit=1&apikey={api_key}"
+    metrics_url = f"https://financialmodelingprep.com/api/v3/key-metrics-full/{ticker}?limit=1&apikey={api_key}"
 
     try:
         cf_data = requests.get(cf_url).json()[0]
         metrics = requests.get(metrics_url).json()[0]
     except Exception:
-        return {"error": "Échec de la récupération des données FCF pour le DCF."}
+        return {"error": "Échec de la récupération des données FCF pour le DCF. Endpoints non supportés."}
 
     fcf_base = cf_data.get('freeCashFlow', 0)
     shares_outstanding = metrics.get('sharesOutstanding', 1)
@@ -60,7 +61,7 @@ def calculate_dcf(ticker: str, wacc: float, growth_rate: float, api_key: str):
         "fcf_base": fcf_base
     }
 
-# --- Fonction Serverless de Vercel (Point d'entrée corrigé) ---
+# --- Fonction Serverless de Vercel ---
 def handler(request):
     """
     Retourne un dictionnaire qui est automatiquement converti en JSON par Vercel.
