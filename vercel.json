@@ -10,6 +10,14 @@
     {
       "src": "/api/(.*)",
       "dest": "/api/$1"
+    },
+    {
+      "src": "/[^.]+",
+      "dest": "/client/dist/index.html"
+    },
+    {
+      "src": "/",
+      "dest": "/client/dist/index.html"
     }
   ]
 }
