@@ -1,108 +1,111 @@
-/* Fichier : client/src/styles.css (ou app.css) */
-body {
-    font-family: sans-serif;
-    background-color: #121212; /* Thème sombre */
-    color: #e0e0e0;
-    margin: 0;
-    padding: 20px;
+import React, { useState } from 'react';
+import './styles.css'; 
+
+function App() {
+  const [ticker, setTicker] = useState('MSFT');
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState(null);
+  
+  // L'URL de base pour appeler la fonction Python alpha_data_fetcher
+  const BASE_URL = '/api'; 
+
+  const fetchData = async () => {
+    if (!ticker) return;
+
+    setLoading(true);
+    setData(null);
+
+    try {
+      // --- APPEL UNIQUE ALPHA VANTAGE ---
+      const metricsRes = await fetch(`${BASE_URL}/alpha_data_fetcher?ticker=${ticker}`);
+      const metricsJson = await metricsRes.json();
+      
+      if (!metricsJson.success) {
+        throw new Error(metricsJson.error || 'Erreur lors de la récupération des données Alpha Vantage.');
+      }
+
+      const metrics = metricsJson.data;
+
+      // Logique d'affichage simple du statut Bêta (Règle: Beta > 1.0 = Rouge)
+      const betaStatus = metrics.beta > 1.0 ? 'Rouge' : 'Vert';
+
+      setData({
+        ticker,
+        metrics,
+        betaStatus,
+        error: null
+      });
+
+    } catch (error) {
+      setData({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container">
+      <h1>💰 Tableau de Bord Alpha Vantage (Données Brutes)</h1>
+      
+      {/* ----------------- Composant de Recherche ----------------- */}
+      <div className="search-bar">
+        <input
+          type="text"
+          value={ticker}
+          onChange={(e) => setTicker(e.target.value.toUpperCase())}
+          placeholder="Entrez un Ticker (ex: MSFT)"
+        />
+        <button onClick={fetchData} disabled={loading}>
+          {loading ? 'Connexion Alpha Vantage...' : 'Analyser le Ticker'}
+        </button>
+      </div>
+
+      {/* Affichage des Erreurs */}
+      {data && data.error && <p className="error-message">Erreur : {data.error}</p>}
+
+      {/* ----------------- AFFICHAGE DES RÉSULTATS ----------------- */}
+      {data && !data.error && (
+        <div className="results">
+          <h2>Résultats Bruts pour {data.ticker}</h2>
+
+          <div className="grid-layout" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              
+              {/* Carte 1 : VALEUR (P/E) */}
+              <div className="kpi-card bg-green">
+                <h3>Ratio P/E Brut</h3>
+                <p className="kpi-value">{data.metrics.pe_ratio}</p>
+                <small>Donnée brute Alpha Vantage</small>
+              </div>
+
+              {/* Carte 2 : VOLATILITÉ (Bêta) */}
+              <div className={`kpi-card ${data.betaStatus === 'Vert' ? 'bg-green' : 'bg-red'}`}>
+                <h3>Bêta Brut</h3>
+                <p className="kpi-value">{data.metrics.beta}</p>
+                <small>Volatilité par rapport au marché</small>
+              </div>
+
+              {/* Carte 3 : CAP BOURSIERE (Market Cap) */}
+              <div className="kpi-card bg-green">
+                <h3>Capitalisation Boursière</h3>
+                {/* Formatage en Milliards pour la lisibilité */}
+                <p className="kpi-value">${(data.metrics.market_cap / 1e9).toFixed(2)} Mds</p>
+                <small>Donnée financière brute</small>
+              </div>
+          </div>
+          
+          <hr/>
+          
+          <div className="dcf-panel">
+            <h3>Métriques Détaillées</h3>
+            <p>EPS TTM : <strong>${data.metrics.eps_ttm}</strong></p>
+            {/* Affichage de la Dette Nette */}
+            <p>Dette Nette : <strong>${(data.metrics.net_debt / 1e9).toFixed(2)} Mds</strong></p>
+            <p>Actions en Circulation : <strong>{(data.metrics.shares_outstanding / 1e9).toFixed(2)} Mds</strong></p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
-.container {
-    max-width: 1000px;
-    margin: 0 auto;
-}
-h1 {
-    color: #1dd755; /* Vert vif pour les titres */
-    text-align: center;
-}
-/* Styles de la Barre de Recherche */
-.search-bar {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 30px;
-}
-.search-bar input {
-    flex-grow: 1;
-    background-color: #2c2c2c;
-    color: #fff;
-    padding: 12px;
-    border: 1px solid #444;
-    border-radius: 6px;
-}
-.search-bar button {
-    background-color: #1dd755; /* Vert vif pour le bouton */
-    color: #121212;
-    padding: 12px 20px;
-    border: none;
-    border-radius: 6px;
-    font-weight: bold;
-    cursor: pointer;
-}
-/* Mise en Page des KPI (Grille) */
-.grid-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr; /* 3 colonnes pour les 3 KPI principaux */
-    gap: 20px;
-    margin-bottom: 20px;
-}
-.kpi-card {
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-}
-/* Classes de Scoring (Rouge/Vert) */
-.bg-green {
-    background-color: #004d00; /* Vert foncé pour le succès */
-    border-left: 5px solid #1dd755;
-}
-.bg-red {
-    background-color: #5c0000; /* Rouge foncé pour l'échec */
-    border-left: 5px solid #ff4444;
-}
-.kpi-value {
-    font-size: 28px;
-    font-weight: bold;
-    margin: 5px 0 10px;
-}
-.kpi-rule {
-    font-size: 12px;
-    opacity: 0.7;
-}
-/* Styles DCF Interactive */
-.dcf-panel {
-    background-color: #1e1e1e;
-    padding: 25px;
-    border-radius: 8px;
-    border: 1px solid #333;
-}
-.input-group {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    margin: 15px 0;
-}
-.input-group input {
-    width: 80px;
-    text-align: right;
-    padding: 8px;
-    background-color: #333;
-    color: #fff;
-    border: 1px solid #555;
-    border-radius: 4px;
-}
-.price-output {
-    font-size: 20px;
-    margin-top: 20px;
-    font-weight: 500;
-}
-.price-value {
-    font-size: 38px;
-    color: #1dd755;
-    font-weight: bold;
-    margin-left: 15px;
-}
-.error-message {
-    color: #ff4444;
-    background-color: #2c1a1a;
-    padding: 15px;
-    border-radius: 6px;
-}
+
+export default App;
